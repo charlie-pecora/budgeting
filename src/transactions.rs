@@ -2,14 +2,13 @@ use std::{fs::File, path::PathBuf, str::FromStr};
 
 use anyhow::Result;
 use chrono::naive::NaiveDate;
-use uuid::Uuid;
 use sqlx::sqlite::SqlitePool;
+use uuid::Uuid;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, sqlx::Type)]
 pub struct NewTransaction {
     transaction_date: NaiveDate,
     description: String,
-    category: String,
     amount_cents: i64,
     status: String,
 }
@@ -20,21 +19,20 @@ pub struct Transaction {
     account_id: String,
     transaction_date: NaiveDate,
     description: String,
-    category: String,
     amount_cents: i64,
     status: String,
 }
 
 pub async fn list_transactions(db: &SqlitePool) -> Result<Vec<Transaction>> {
-    Ok(vec![Transaction {
-        id: Uuid::now_v7().hyphenated().to_string(),
-        account_id: Uuid::now_v7().hyphenated().to_string(),
-        transaction_date: NaiveDate::parse_from_str("2023-01-01", "%Y-%m-%d")?,
-        description: String::from("test transaction"),
-        category: String::from("ballin"),
-        amount_cents: 1234,
-        status: String::from("Pending"),
-    }])
+    let transactions = sqlx::query_as!(
+        Transaction,
+        "
+        select * from transactions;
+        "
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(transactions)
 }
 
 pub async fn load_transactions_from_file(
@@ -52,7 +50,6 @@ pub async fn load_transactions_from_file(
         let transaction = NewTransaction {
             transaction_date: NaiveDate::parse_from_str(&record[0], "%Y-%m-%d")?,
             description: record[2].to_string(),
-            category: record[3].to_string(),
             amount_cents: parse_cents(&record[4])?,
             status: record[5].to_string(),
         };
@@ -64,7 +61,6 @@ pub async fn load_transactions_from_file(
 }
 
 fn parse_cents(cents_str: &str) -> Result<i64> {
-    let mut cents: i64 = 0;
     // break down dollars and cents
     let destructured: Vec<&str> = cents_str.split('.').collect();
     let mut dollars_str = "0".to_string();
@@ -97,11 +93,15 @@ fn parse_cents(cents_str: &str) -> Result<i64> {
     if dollars_str.len() > 0 && &dollars_str[..1] == "-" {
         _cents = -1 * _cents;
     }
-    cents = dollars * 100 + _cents;
+    let cents = dollars * 100 + _cents;
     Ok(cents)
 }
 
-pub async fn insert_transaction(db: &SqlitePool, transaction: &NewTransaction, account_id: &str) -> Result<Transaction> {
+pub async fn insert_transaction(
+    db: &SqlitePool,
+    transaction: &NewTransaction,
+    account_id: &str,
+) -> Result<Transaction> {
     let id = Uuid::now_v7().hyphenated().to_string();
     let created = sqlx::query_as!(
         Transaction,
@@ -111,11 +111,9 @@ insert into transactions (
     account_id,
     transaction_date,
     description,
-    category,
     amount_cents,
     status
 ) values (
-    ?,
     ?,
     ?,
     ?,
@@ -128,10 +126,11 @@ insert into transactions (
         account_id,
         transaction.transaction_date,
         transaction.description,
-        transaction.category,
         transaction.amount_cents,
         transaction.status
-    ).fetch_one(db).await?; 
+    )
+    .fetch_one(db)
+    .await?;
     println!("{:?}", &created);
     return Ok(created);
 }

@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use budgeting::banks::{create_bank, list_banks};
 use budgeting::transactions::{list_transactions, load_transactions_from_file};
 use clap::{Parser, Subcommand};
 use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
@@ -24,6 +25,11 @@ enum Commands {
 
         #[clap(long)]
         account_id: String,
+    },
+    GetBanks,
+    CreateBank {
+        #[clap(long)]
+        name: String,
     },
 }
 
@@ -49,6 +55,16 @@ async fn main() -> anyhow::Result<()> {
                 "Loaded {} transactions from {:?} to account {:?}",
                 loaded_count, source, account_id
             );
+        }
+        Commands::GetBanks => {
+            let banks = list_banks(&db).await?;
+            for bank in banks {
+                println!("{}", serde_json::to_string(&bank)?);
+            }
+        }
+        Commands::CreateBank { name } => {
+            let new_bank = create_bank(&db, name).await?;
+            println!("{}", serde_json::to_string(&new_bank)?);
         }
     }
     Ok(())
