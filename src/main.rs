@@ -97,10 +97,8 @@ async fn main() -> anyhow::Result<()> {
             bank_id,
             type_id,
         } => {
-            let accounts = create_account(&db, name, bank_id, type_id).await?;
-            for account in accounts {
-                println!("{}", serde_json::to_string(&account)?);
-            }
+            let account = create_account(&db, name, bank_id, type_id).await?;
+            println!("{}", serde_json::to_string(&account)?);
         }
         Commands::GetAccountTypes => {
             let account_types = list_account_types(&db).await?;

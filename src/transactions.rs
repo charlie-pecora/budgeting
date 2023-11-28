@@ -16,18 +16,48 @@ pub struct NewTransaction {
 #[derive(serde::Serialize, serde::Deserialize, Debug, sqlx::Type)]
 pub struct Transaction {
     id: String,
-    account_id: String,
+    account_name: String,
     transaction_date: NaiveDate,
     description: String,
     amount_cents: i64,
     status: String,
 }
 
+pub async fn get_transaction(db: &SqlitePool, id: &str) -> Result<Transaction> {
+    let transaction = sqlx::query_as!(
+        Transaction,
+        "
+select 
+    t.id, 
+    a.name as account_name, 
+    t.transaction_date, 
+    t.description,
+    t.amount_cents,
+    t.status 
+from transactions t
+join accounts a on t.account_id = a.id
+where t.id = ?;
+        ",
+        id,
+    )
+    .fetch_one(db)
+    .await?;
+    Ok(transaction)
+}
+
 pub async fn list_transactions(db: &SqlitePool) -> Result<Vec<Transaction>> {
     let transactions = sqlx::query_as!(
         Transaction,
         "
-        select * from transactions;
+select 
+    t.id, 
+    a.name as account_name, 
+    t.transaction_date, 
+    t.description,
+    t.amount_cents,
+    t.status 
+from transactions t
+join accounts a on t.account_id = a.id;
         "
     )
     .fetch_all(db)
@@ -103,7 +133,7 @@ pub async fn insert_transaction(
     account_id: &str,
 ) -> Result<Transaction> {
     let id = Uuid::now_v7().hyphenated().to_string();
-    let created = sqlx::query_as!(
+    sqlx::query_as!(
         Transaction,
         "
 insert into transactions (
@@ -120,19 +150,18 @@ insert into transactions (
     ?,
     ?,
     ?
-) returning *;
+)
         ",
         id,
         account_id,
         transaction.transaction_date,
         transaction.description,
         transaction.amount_cents,
-        transaction.status
+        transaction.status,
     )
-    .fetch_one(db)
+    .execute(db)
     .await?;
-    println!("{:?}", &created);
-    return Ok(created);
+    return get_transaction(db, &id).await;
 }
 
 #[cfg(test)]
