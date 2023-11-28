@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use budgeting::accounts::{create_account, create_account_type, list_account_types, list_accounts};
 use budgeting::banks::{create_bank, list_banks};
 use budgeting::transactions::{list_transactions, load_transactions_from_file};
 use clap::{Parser, Subcommand};
@@ -28,6 +29,23 @@ enum Commands {
     },
     GetBanks,
     CreateBank {
+        #[clap(long)]
+        name: String,
+    },
+    GetAccounts {
+        #[clap(long)]
+        bank_id: Option<String>,
+    },
+    CreateAccount {
+        #[clap(long)]
+        name: String,
+        #[clap(long)]
+        bank_id: String,
+        #[clap(long)]
+        type_id: String,
+    },
+    GetAccountTypes,
+    CreateAccountType {
         #[clap(long)]
         name: String,
     },
@@ -63,8 +81,38 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Commands::CreateBank { name } => {
-            let new_bank = create_bank(&db, name).await?;
-            println!("{}", serde_json::to_string(&new_bank)?);
+            let banks = create_bank(&db, name).await?;
+            for bank in banks {
+                println!("{}", serde_json::to_string(&bank)?);
+            }
+        }
+        Commands::GetAccounts { bank_id } => {
+            let accounts = list_accounts(&db, bank_id).await?;
+            for account in accounts {
+                println!("{}", serde_json::to_string(&account)?);
+            }
+        }
+        Commands::CreateAccount {
+            name,
+            bank_id,
+            type_id,
+        } => {
+            let accounts = create_account(&db, name, bank_id, type_id).await?;
+            for account in accounts {
+                println!("{}", serde_json::to_string(&account)?);
+            }
+        }
+        Commands::GetAccountTypes => {
+            let account_types = list_account_types(&db).await?;
+            for account_type in account_types {
+                println!("{}", serde_json::to_string(&account_type)?);
+            }
+        }
+        Commands::CreateAccountType { name } => {
+            let account_types = create_account_type(&db, name).await?;
+            for account_type in account_types {
+                println!("{}", serde_json::to_string(&account_type)?);
+            }
         }
     }
     Ok(())

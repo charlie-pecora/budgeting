@@ -11,10 +11,10 @@ create table account_types (
 );
 
 create table accounts (
-    id varchar primary key,
+    id varchar primary key not null,
     name varchar not null,
     bank_id varchar not null references banks(id),
-    type varchar not null references account_types(id)
+    type_id varchar not null references account_types(id)
 );
 
 create table transactions (
