@@ -4,6 +4,7 @@ use std::str::FromStr;
 use budgeting::accounts::{create_account, create_account_type, list_account_types, list_accounts};
 use budgeting::banks::{create_bank, list_banks};
 use budgeting::transactions::{list_transactions, load_transactions_from_file};
+use budgeting::app;
 use clap::{Parser, Subcommand};
 use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 
@@ -19,6 +20,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    Run,
     GetTransactions,
     LoadTransactions {
         #[arg(value_name = "FILE")]
@@ -61,6 +63,9 @@ async fn main() -> anyhow::Result<()> {
     sqlx::migrate!().run(&db).await?;
 
     match &cli.command {
+        Commands::Run => {
+            let _ = app::run(db);
+        },
         Commands::GetTransactions => {
             let transactions = list_transactions(&db).await?;
             for transaction in transactions {
