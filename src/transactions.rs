@@ -13,7 +13,7 @@ pub struct NewTransaction {
     status: String,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, sqlx::Type)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, sqlx::Type, Clone)]
 pub struct Transaction {
     id: String,
     account_name: String,
