@@ -18,7 +18,7 @@ pub struct Account {
 
 pub async fn get_account(db: &SqlitePool, id: &str) -> Result<Account> {
     let account = sqlx::query_as!(
-        Account, 
+        Account,
         "
 select a.id,
        a.name,
@@ -28,11 +28,11 @@ from accounts a
 join account_types at on a.type_id = at.id
 join banks b on a.bank_id = b.id
 where a.id = ?;
-        ", 
+        ",
         id
     )
-        .fetch_one(db)
-        .await?;
+    .fetch_one(db)
+    .await?;
     Ok(account)
 }
 
@@ -40,7 +40,7 @@ pub async fn list_accounts(db: &SqlitePool, bank_id: &Option<String>) -> Result<
     let accounts = match bank_id {
         Some(v) => {
             sqlx::query_as!(
-                Account, 
+                Account,
                 "
 select a.id,
        a.name,
@@ -53,12 +53,12 @@ where b.id = ?;
                 ",
                 v
             )
-                .fetch_all(db)
-                .await?
+            .fetch_all(db)
+            .await?
         }
         None => {
             sqlx::query_as!(
-                Account, 
+                Account,
                 "
 select a.id,
        a.name,
@@ -69,8 +69,8 @@ join account_types at on a.type_id = at.id
 join banks b on a.bank_id = b.id;
                 "
             )
-                .fetch_all(db)
-                .await?
+            .fetch_all(db)
+            .await?
         }
     };
     Ok(accounts)
