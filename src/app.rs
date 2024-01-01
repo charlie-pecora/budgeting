@@ -1,14 +1,11 @@
 use sqlx::SqlitePool;
 
-use std::fmt;
-
 use iced::subscription::{self, Subscription};
-use iced::widget::{Button, Column, Container, Text};
+use iced::widget::{Button, Column, Container, Text, text, row, scrollable};
 use iced::{executor, futures, Application, Command, Element, Settings, Theme};
 
 use futures::channel::mpsc;
 use futures::sink::SinkExt;
-use futures::stream::StreamExt;
 
 use crate::transactions::{list_transactions, Transaction};
 
@@ -75,14 +72,31 @@ impl Application for App {
 
     fn update(&mut self, message: AppMessage) -> Command<AppMessage> {
         match message {
-            AppMessage::Worker(m) => {
-                println!("{:?}", m);
+            AppMessage::Worker(event) => {
+                eprintln!("received {event:?}");
+                match event {
+                    Event::Connected(connection) => {
+                        self.state = AppState::Connected(connection);
+                        eprintln!("AppState connected!");
+                    }
+                    Event::LoadedTransactions(transactions) => {
+                        self.transactions = transactions;
+                    }
+                    _ => {eprintln!("Something else happened {event:?}")},
+                }
                 Command::none()
-            }
+            },
             AppMessage::LoadTransactions => {
                 println!("Loading transactions");
+                match &mut self.state {
+                    AppState::Connected(connection) => {
+                        eprintln!("connected");
+                        connection.send(Message::LoadTransactions);
+                    }
+                    AppState::Disconnected => eprintln!("Can't load transactions, app is not connected."),
+                }
                 Command::none()
-            }
+            },
         }
     }
 
@@ -94,7 +108,19 @@ impl Application for App {
         let title = Text::new("Transactions");
         let load_transactions_button =
             Button::new("Load Transactions").on_press(AppMessage::LoadTransactions);
-        let col = Column::new().push(title).push(load_transactions_button);
+        let transactions: Element<_> = scrollable(
+            Column::with_children(
+                self.transactions
+                .iter()
+                .cloned()
+                .enumerate()
+                .map(|(i, transaction)| {
+                    Element::from(row![text(i), text(transaction.description)])
+                })
+                .collect()
+            )
+        ).into();
+        let col = Column::new().push(title).push(load_transactions_button).push(transactions);
         Container::new(col)
             .center_x()
             .width(iced::Length::Fill)
@@ -111,21 +137,46 @@ pub fn connect(db: SqlitePool) -> Subscription<Event> {
         100,
         |mut output| async move {
             let mut state = State::Disconnected;
+            let _ = output.send(Event::Disconnected).await;
 
             loop {
                 match &mut state {
                     State::Disconnected => {
                         let (sender, receiver) = mpsc::channel(100);
+                        println!("created");
 
                         let _ = output.send(Event::Connected(Connection(sender))).await;
 
                         state = State::Connected(receiver);
+                        println!("initialized");
                     }
                     State::Connected(receiver) => {
-                        let input = receiver.select_next_some().await;
-
-                        match input {
-                            _ => {}
+                        match receiver.try_next() {
+                            Ok(Some(input)) => {
+                                match input {
+                                    Message::LoadTransactions => {
+                                        println!("Got loading message");
+                                        match list_transactions(&db).await {
+                                            Ok(transactions) => {
+                                                println!("{:?}", transactions);
+                                                let _ = output.send(Event::LoadedTransactions(transactions)).await;
+                                            },
+                                            Err(e) => {
+                                                eprintln!("couldn't load transactions {}", e);
+                                            }
+                                        }
+                                    },
+                                }
+                            },
+                            Ok(None) => continue,
+                            Err(e) => {
+                                eprintln!("{:?}", e);
+                                tokio::time::sleep(
+                                    tokio::time::Duration::from_secs(1),
+                                )
+                                .await;
+                                // state = State::Disconnected;
+                            },
                         }
                     }
                 }
@@ -145,7 +196,7 @@ enum State {
 pub enum Event {
     Connected(Connection),
     Disconnected,
-    MessageReceived(Message),
+    LoadedTransactions(Vec<Transaction>),
 }
 
 #[derive(Debug, Clone)]
@@ -155,43 +206,12 @@ impl Connection {
     pub fn send(&mut self, message: Message) {
         self.0
             .try_send(message)
-            .expect("Send message to echo server");
+            .expect("Send message to worker server");
     }
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    Connected,
-    Disconnected,
-    User(String),
+    LoadTransactions,
 }
 
-impl Message {
-    pub fn new(message: &str) -> Option<Self> {
-        if message.is_empty() {
-            None
-        } else {
-            Some(Self::User(message.to_string()))
-        }
-    }
-
-    pub fn connected() -> Self {
-        Message::Connected
-    }
-
-    pub fn disconnected() -> Self {
-        Message::Disconnected
-    }
-}
-
-impl fmt::Display for Message {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Message::Connected => write!(f, "Connected successfully!"),
-            Message::Disconnected => {
-                write!(f, "Connection lost... Retrying...")
-            }
-            Message::User(message) => write!(f, "{message}"),
-        }
-    }
-}

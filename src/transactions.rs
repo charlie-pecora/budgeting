@@ -15,12 +15,12 @@ pub struct NewTransaction {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, sqlx::Type, Clone)]
 pub struct Transaction {
-    id: String,
-    account_name: String,
-    transaction_date: NaiveDate,
-    description: String,
-    amount_cents: i64,
-    status: String,
+    pub id: String,
+    pub account_name: String,
+    pub transaction_date: NaiveDate,
+    pub description: String,
+    pub amount_cents: i64,
+    pub status: String,
 }
 
 pub async fn get_transaction(db: &SqlitePool, id: &str) -> Result<Transaction> {
