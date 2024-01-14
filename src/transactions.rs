@@ -15,12 +15,18 @@ pub struct NewTransaction {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, sqlx::Type)]
 pub struct Transaction {
-    id: String,
-    account_name: String,
-    transaction_date: NaiveDate,
-    description: String,
-    amount_cents: i64,
-    status: String,
+    pub id: String,
+    pub account_name: String,
+    pub transaction_date: NaiveDate,
+    pub description: String,
+    pub amount_cents: i64,
+    pub status: String,
+}
+
+impl Transaction {
+    pub fn format_dollars_cents(&self) -> String {
+        format!("${}.{}", self.amount_cents / 100, (self.amount_cents % 100).abs())
+    }
 }
 
 pub async fn get_transaction(db: &SqlitePool, id: &str) -> Result<Transaction> {

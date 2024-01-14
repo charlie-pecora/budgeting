@@ -2,8 +2,10 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use budgeting::accounts::{create_account, create_account_type, list_account_types, list_accounts};
+use budgeting::app::run_app;
 use budgeting::banks::{create_bank, list_banks};
 use budgeting::transactions::{list_transactions, load_transactions_from_file};
+
 use clap::{Parser, Subcommand};
 use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 
@@ -49,6 +51,7 @@ enum Commands {
         #[clap(long)]
         name: String,
     },
+    App,
 }
 
 #[tokio::main]
@@ -111,6 +114,9 @@ async fn main() -> anyhow::Result<()> {
             for account_type in account_types {
                 println!("{}", serde_json::to_string(&account_type)?);
             }
+        }
+        Commands::App => {
+            run_app(db).await?;
         }
     }
     Ok(())
